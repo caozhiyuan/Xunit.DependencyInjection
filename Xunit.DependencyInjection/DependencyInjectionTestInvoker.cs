@@ -1,8 +1,8 @@
-﻿using System;
+﻿using Microsoft.Extensions.DependencyInjection;
+using System;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
@@ -10,45 +10,34 @@ namespace Xunit.DependencyInjection
 {
     public class DependencyInjectionTestInvoker : TestInvoker<IXunitTestCase>
     {
-        //testclass run one by one
-        private static readonly SemaphoreSlim SemaphoreSlim = new SemaphoreSlim(1, 1);
+        private readonly ITestOutputHelperAccessor _accessor;
 
-        private readonly TestOutputHelper _testOutputHelper;
-
-        public DependencyInjectionTestInvoker(IServiceProvider provider, ITest test, IMessageBus messageBus, Type testClass, object[] constructorArguments, MethodInfo testMethod, object[] testMethodArguments, ExceptionAggregator aggregator, CancellationTokenSource cancellationTokenSource) : base(test, messageBus, testClass, constructorArguments, testMethod, testMethodArguments, aggregator, cancellationTokenSource)
+        public DependencyInjectionTestInvoker(IServiceProvider provider, ITest test, IMessageBus messageBus, Type testClass,
+            object[] constructorArguments, MethodInfo testMethod, object[] testMethodArguments,
+            ExceptionAggregator aggregator, CancellationTokenSource cancellationTokenSource) : base(test, messageBus,
+            testClass, constructorArguments, testMethod, testMethodArguments, aggregator, cancellationTokenSource)
         {
-            try
-            {
-                _testOutputHelper = (TestOutputHelper)provider.GetRequiredService<ITestOutputHelper>();
-            }
-            catch (InvalidOperationException)
-            {
-                // ignored
-            }
+            _accessor = provider.GetRequiredService<ITestOutputHelperAccessor>();
         }
 
         public string Output { get; set; }
 
-        protected override async Task BeforeTestMethodInvokedAsync()
+        protected override Task BeforeTestMethodInvokedAsync()
         {
-            if (_testOutputHelper != null)
-            {
-                await SemaphoreSlim.WaitAsync();
-                _testOutputHelper.Initialize(MessageBus, Test);
-            }
+            if (_accessor.Output is TestOutputHelper output)
+                output.Initialize(MessageBus, Test);
 
-            await  base.BeforeTestMethodInvokedAsync();
+            return base.BeforeTestMethodInvokedAsync();
         }
 
         protected override Task AfterTestMethodInvokedAsync()
         {
-            if (_testOutputHelper != null)
+            if (_accessor.Output is TestOutputHelper output)
             {
-                Output = _testOutputHelper.Output;
-                _testOutputHelper.Uninitialize();
-                SemaphoreSlim.Release();
+                Output = output.Output;
+                output.Uninitialize();
             }
-            
+
             return base.AfterTestMethodInvokedAsync();
         }
     }

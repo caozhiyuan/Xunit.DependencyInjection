@@ -21,7 +21,8 @@ namespace Xunit.DependencyInjection
 
             var services = new ServiceCollection();
 
-            services.AddSingleton<IConfiguration>(Root = builder.Build());
+            services.AddSingleton<IConfiguration>(Root = builder.Build())
+                .AddSingleton<ITestOutputHelperAccessor, TestOutputHelperAccessor>();
 
             var provider = ConfigureServices(services);
 
